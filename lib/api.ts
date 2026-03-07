@@ -78,23 +78,23 @@ export type WebsiteContent = {
   hero: {
     title: string;
     bodyText: string;
-    image?: { url?: string };
+    image?: { public_id?: string; url?: string };
   };
   about: {
     title: string;
     bodyText: string;
-    image?: { url?: string };
+    image?: { public_id?: string; url?: string };
   };
   creative: {
     title: string;
     bodyText: string;
-    heroImage?: { url?: string };
-    images?: Array<{ url?: string }>;
+    heroImage?: { public_id?: string; url?: string };
+    images?: Array<{ public_id?: string; url?: string }>;
   };
   client: {
     title: string;
     bodyText: string;
-    image?: { url?: string };
+    image?: { public_id?: string; url?: string };
   };
   contact: {
     address: string;
@@ -124,6 +124,51 @@ export type ProfileUser = {
   role: "admin" | "client" | "creative";
   profileImage?: { url?: string };
 };
+
+export type SubscriptionBillingCycle = "monthly" | "yearly";
+
+export type SubscriptionRow = {
+  _id: string;
+  name: string;
+  price: number;
+  billingCycle: SubscriptionBillingCycle;
+  title?: string;
+  includes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupportTicketRow = {
+  _id: string;
+  ticketId: string;
+  subject: string;
+  category: string;
+  priority: "low" | "medium" | "high" | "urgent";
+  description: string;
+  status: "open" | "in_progress" | "waiting_for_user" | "resolved" | "closed";
+  resolution?: string;
+  attachments?: Array<{
+    public_id?: string;
+    url?: string;
+    fileType?: string;
+    fileName?: string;
+  }>;
+  user?: {
+    _id: string;
+    name: string;
+    email: string;
+    profileImage?: { url?: string };
+  };
+  createdAt: string;
+  updatedAt: string;
+};
+
+function isNotFoundError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const maybe = error as { response?: { status?: number } };
+  return maybe.response?.status === 404;
+}
 
 const api = axios.create({
   baseURL: APP_CONFIG.baseUrl,
@@ -332,6 +377,91 @@ export const adminApi = {
     return data;
   },
 
+  async blockUser(targetUserId: string, reason = "Blocked by admin panel") {
+    const { data } = await api.post<ApiResponse<null>>("/social/block", { targetUserId, reason });
+    return data;
+  },
+
+  async unblockUser(targetUserId: string) {
+    const { data } = await api.delete<ApiResponse<null>>(`/social/block/${targetUserId}`);
+    return data;
+  },
+
+  async getSubscriptions(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    billingCycle?: SubscriptionBillingCycle;
+  }) {
+    const { data } = await api.get<ApiResponse<{ subscriptions: SubscriptionRow[]; pagination: Pagination }>>(
+      "/admin/subscriptions",
+      { params },
+    );
+    return data.data;
+  },
+
+  async createSubscription(payload: {
+    name: string;
+    price: number;
+    billingCycle: SubscriptionBillingCycle;
+    title?: string;
+    includes?: string;
+    isActive?: boolean;
+  }) {
+    const { data } = await api.post<ApiResponse<SubscriptionRow>>("/admin/subscriptions", payload);
+    return data;
+  },
+
+  async updateSubscription(
+    subscriptionId: string,
+    payload: {
+      name?: string;
+      price?: number;
+      billingCycle?: SubscriptionBillingCycle;
+      title?: string;
+      includes?: string;
+      isActive?: boolean;
+    },
+  ) {
+    const { data } = await api.patch<ApiResponse<SubscriptionRow>>(`/admin/subscriptions/${subscriptionId}`, payload);
+    return data;
+  },
+
+  async deleteSubscription(subscriptionId: string) {
+    const { data } = await api.delete<ApiResponse<null>>(`/admin/subscriptions/${subscriptionId}`);
+    return data;
+  },
+
+  async getSupportTickets(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    category?: string;
+    priority?: string;
+  }) {
+    const { data } = await api.get<ApiResponse<{ tickets: SupportTicketRow[]; pagination: Pagination }>>("/support/tickets", {
+      params,
+    });
+    return data.data;
+  },
+
+  async getSupportTicketById(ticketId: string) {
+    const { data } = await api.get<ApiResponse<SupportTicketRow>>(`/support/tickets/${ticketId}`);
+    return data.data;
+  },
+
+  async updateSupportTicketStatus(
+    ticketId: string,
+    payload: {
+      status: "open" | "in_progress" | "waiting_for_user" | "resolved" | "closed";
+      resolution?: string;
+    },
+  ) {
+    const { data } = await api.patch<ApiResponse<null>>(`/support/tickets/${ticketId}/status`, payload);
+    return data;
+  },
+
   async getRevenue(params?: { search?: string }) {
     const { data } = await api.get<ApiResponse<RevenueResponse>>("/admin/revenue", { params });
     return data.data;
@@ -388,8 +518,52 @@ export const websiteApi = {
     return data.data;
   },
 
+  async getHeroSection() {
+    const { data } = await api.get<ApiResponse<WebsiteContent["hero"]>>("/website/hero");
+    return data.data;
+  },
+
+  async getAboutSection() {
+    const { data } = await api.get<ApiResponse<WebsiteContent["about"]>>("/website/about");
+    return data.data;
+  },
+
+  async getCreativeSection() {
+    const { data } = await api.get<ApiResponse<WebsiteContent["creative"]>>("/website/creative");
+    return data.data;
+  },
+
+  async getClientSection() {
+    const { data } = await api.get<ApiResponse<WebsiteContent["client"]>>("/website/client");
+    return data.data;
+  },
+
+  async getContactSection() {
+    const { data } = await api.get<ApiResponse<WebsiteContent["contact"]>>("/website/contact");
+    return data.data;
+  },
+
+  async createHero(formData: FormData) {
+    const { data } = await api.post<ApiResponse<WebsiteContent["hero"]>>("/website/hero", formData);
+    return data;
+  },
+
   async updateHero(formData: FormData) {
     const { data } = await api.put<ApiResponse<WebsiteContent["hero"]>>("/website/hero", formData);
+    return data;
+  },
+
+  async saveHero(formData: FormData) {
+    try {
+      return await this.updateHero(formData);
+    } catch (error) {
+      if (isNotFoundError(error)) return this.createHero(formData);
+      throw error;
+    }
+  },
+
+  async createAbout(formData: FormData) {
+    const { data } = await api.post<ApiResponse<WebsiteContent["about"]>>("/website/about", formData);
     return data;
   },
 
@@ -398,8 +572,36 @@ export const websiteApi = {
     return data;
   },
 
+  async saveAbout(formData: FormData) {
+    try {
+      return await this.updateAbout(formData);
+    } catch (error) {
+      if (isNotFoundError(error)) return this.createAbout(formData);
+      throw error;
+    }
+  },
+
+  async createCreative(formData: FormData) {
+    const { data } = await api.post<ApiResponse<WebsiteContent["creative"]>>("/website/creative", formData);
+    return data;
+  },
+
   async updateCreative(formData: FormData) {
     const { data } = await api.put<ApiResponse<WebsiteContent["creative"]>>("/website/creative", formData);
+    return data;
+  },
+
+  async saveCreative(formData: FormData) {
+    try {
+      return await this.updateCreative(formData);
+    } catch (error) {
+      if (isNotFoundError(error)) return this.createCreative(formData);
+      throw error;
+    }
+  },
+
+  async createClient(formData: FormData) {
+    const { data } = await api.post<ApiResponse<WebsiteContent["client"]>>("/website/client", formData);
     return data;
   },
 
@@ -408,9 +610,32 @@ export const websiteApi = {
     return data;
   },
 
+  async saveClient(formData: FormData) {
+    try {
+      return await this.updateClient(formData);
+    } catch (error) {
+      if (isNotFoundError(error)) return this.createClient(formData);
+      throw error;
+    }
+  },
+
+  async createContact(payload: WebsiteContent["contact"]) {
+    const { data } = await api.post<ApiResponse<WebsiteContent["contact"]>>("/website/contact", payload);
+    return data;
+  },
+
   async updateContact(payload: WebsiteContent["contact"]) {
     const { data } = await api.put<ApiResponse<WebsiteContent["contact"]>>("/website/contact", payload);
     return data;
+  },
+
+  async saveContact(payload: WebsiteContent["contact"]) {
+    try {
+      return await this.updateContact(payload);
+    } catch (error) {
+      if (isNotFoundError(error)) return this.createContact(payload);
+      throw error;
+    }
   },
 };
 

@@ -2,9 +2,8 @@
 
 import { ChangeEvent, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
-import { Topbar } from "@/components/layout/topbar";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,8 +19,15 @@ type SectionState = {
   image: File | null;
 };
 
+type ContactState = {
+  address: string;
+  phoneNumber: string;
+  email: string;
+};
+
+const resolveText = (value?: string) => value?.trim() || "";
+
 export default function WebsitePage() {
-  const [search, setSearch] = useState("");
   const [hero, setHero] = useState<SectionState>({
     title: "",
     bodyText: "",
@@ -42,7 +48,7 @@ export default function WebsitePage() {
     bodyText: "",
     image: null,
   });
-  const [contact, setContact] = useState({
+  const [contact, setContact] = useState<ContactState>({
     address: "",
     phoneNumber: "",
     email: "",
@@ -50,68 +56,213 @@ export default function WebsitePage() {
   const [creativeImages, setCreativeImages] = useState<File[]>([]);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["website-content"],
-    queryFn: websiteApi.getWebsiteContent,
+    queryKey: ["website-sections"],
+    queryFn: async () => {
+      const [heroSection, aboutSection, creativeSection, clientSection, contactSection] = await Promise.all([
+        websiteApi.getHeroSection(),
+        websiteApi.getAboutSection(),
+        websiteApi.getCreativeSection(),
+        websiteApi.getClientSection(),
+        websiteApi.getContactSection(),
+      ]);
+
+      return {
+        hero: heroSection,
+        about: aboutSection,
+        creative: creativeSection,
+        client: clientSection,
+        contact: contactSection,
+      };
+    },
   });
 
-  const updateMutation = useMutation({
+  const heroMutation = useMutation({
     mutationFn: async () => {
-      const heroForm = new FormData();
-      heroForm.append("title", hero.title || data?.hero.title || "Hero Title");
-      heroForm.append(
-        "bodyText",
-        hero.bodyText || data?.hero.bodyText || "Hero body",
-      );
-      if (hero.image) heroForm.append("image", hero.image);
+      const title = resolveText(hero.title) || resolveText(data?.hero?.title);
+      const bodyText =
+        resolveText(hero.bodyText) || resolveText(data?.hero?.bodyText);
 
-      const aboutForm = new FormData();
-      aboutForm.append(
-        "title",
-        about.title || data?.about.title || "About Title",
-      );
-      aboutForm.append(
-        "bodyText",
-        about.bodyText || data?.about.bodyText || "About body",
-      );
-      if (about.image) aboutForm.append("image", about.image);
+      if (!title || !bodyText) {
+        throw new Error("Hero title and body text are required");
+      }
 
-      const creativeForm = new FormData();
-      creativeForm.append(
-        "title",
-        creative.title || data?.creative.title || "Creative Title",
-      );
-      creativeForm.append(
-        "bodyText",
-        creative.bodyText || data?.creative.bodyText || "Creative body",
-      );
-      if (creative.image) creativeForm.append("heroImage", creative.image);
-      creativeImages.forEach((image) => creativeForm.append("images", image));
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("bodyText", bodyText);
+      if (hero.image) formData.append("image", hero.image);
 
-      const clientForm = new FormData();
-      clientForm.append(
-        "title",
-        client.title || data?.client.title || "Client Title",
-      );
-      clientForm.append(
-        "bodyText",
-        client.bodyText || data?.client.bodyText || "Client body",
-      );
-      if (client.image) clientForm.append("image", client.image);
-
-      await Promise.all([
-        websiteApi.updateHero(heroForm),
-        websiteApi.updateAbout(aboutForm),
-        websiteApi.updateCreative(creativeForm),
-        websiteApi.updateClient(clientForm),
-        websiteApi.updateContact({
-          address: contact.address || data?.contact.address || "",
-          phoneNumber: contact.phoneNumber || data?.contact.phoneNumber || "",
-          email: contact.email || data?.contact.email || "",
-        }),
-      ]);
+      await websiteApi.saveHero(formData);
     },
     onSuccess: async () => {
-      toast.success("Website content updated");
+      toast.success("Hero section updated");
+      setHero((prev) => ({ ...prev, image: null }));
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const removeHeroImageMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      formData.append("removeImage", "true");
+      await websiteApi.updateHero(formData);
+    },
+    onSuccess: async () => {
+      toast.success("Hero image removed");
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const aboutMutation = useMutation({
+    mutationFn: async () => {
+      const title = resolveText(about.title) || resolveText(data?.about?.title);
+      const bodyText =
+        resolveText(about.bodyText) || resolveText(data?.about?.bodyText);
+
+      if (!title || !bodyText) {
+        throw new Error("About title and body text are required");
+      }
+
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("bodyText", bodyText);
+      if (about.image) formData.append("image", about.image);
+
+      await websiteApi.saveAbout(formData);
+    },
+    onSuccess: async () => {
+      toast.success("About section updated");
+      setAbout((prev) => ({ ...prev, image: null }));
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const removeAboutImageMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      formData.append("removeImage", "true");
+      await websiteApi.updateAbout(formData);
+    },
+    onSuccess: async () => {
+      toast.success("About image removed");
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const creativeMutation = useMutation({
+    mutationFn: async () => {
+      const title =
+        resolveText(creative.title) || resolveText(data?.creative?.title);
+      const bodyText =
+        resolveText(creative.bodyText) || resolveText(data?.creative?.bodyText);
+
+      if (!title || !bodyText) {
+        throw new Error("Creative title and body text are required");
+      }
+
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("bodyText", bodyText);
+      if (creative.image) formData.append("heroImage", creative.image);
+      creativeImages.forEach((image) => formData.append("images", image));
+
+      await websiteApi.saveCreative(formData);
+    },
+    onSuccess: async () => {
+      toast.success("Creative section updated");
+      setCreative((prev) => ({ ...prev, image: null }));
+      setCreativeImages([]);
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const removeCreativeHeroImageMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      formData.append("removeHeroImage", "true");
+      await websiteApi.updateCreative(formData);
+    },
+    onSuccess: async () => {
+      toast.success("Creative hero image removed");
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const removeCreativeGalleryImageMutation = useMutation({
+    mutationFn: async (publicId: string) => {
+      const formData = new FormData();
+      formData.append("removeImagePublicIds", JSON.stringify([publicId]));
+      await websiteApi.updateCreative(formData);
+    },
+    onSuccess: async () => {
+      toast.success("Creative image removed");
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const clientMutation = useMutation({
+    mutationFn: async () => {
+      const title = resolveText(client.title) || resolveText(data?.client?.title);
+      const bodyText =
+        resolveText(client.bodyText) || resolveText(data?.client?.bodyText);
+
+      if (!title || !bodyText) {
+        throw new Error("Client title and body text are required");
+      }
+
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("bodyText", bodyText);
+      if (client.image) formData.append("image", client.image);
+
+      await websiteApi.saveClient(formData);
+    },
+    onSuccess: async () => {
+      toast.success("Client section updated");
+      setClient((prev) => ({ ...prev, image: null }));
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const removeClientImageMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      formData.append("removeImage", "true");
+      await websiteApi.updateClient(formData);
+    },
+    onSuccess: async () => {
+      toast.success("Client image removed");
+      await refetch();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+
+  const contactMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        address:
+          resolveText(contact.address) || resolveText(data?.contact?.address),
+        phoneNumber:
+          resolveText(contact.phoneNumber) ||
+          resolveText(data?.contact?.phoneNumber),
+        email: resolveText(contact.email) || resolveText(data?.contact?.email),
+      };
+
+      if (!payload.address || !payload.phoneNumber || !payload.email) {
+        throw new Error("Address, phone number, and email are required");
+      }
+
+      await websiteApi.saveContact(payload);
+    },
+    onSuccess: async () => {
+      toast.success("Contact section updated");
       await refetch();
     },
     onError: (error) => toast.error(getErrorMessage(error)),
@@ -119,92 +270,125 @@ export default function WebsitePage() {
 
   return (
     <div>
-      <div>
-        <Card>
-          <CardContent>
-            <PageHeader
-              title="Manage website"
-              breadcrumbs={["Dashboard", "Manage Website"]}
-              actions={<Button variant="outline">Edit Website</Button>}
-            />
+      <Card>
+        <CardContent className="p-4 lg:p-6">
+          <PageHeader
+            title="Manage website"
+            breadcrumbs={["Dashboard", "Manage Website"]}
+          />
 
-            {isLoading ? (
-              <Skeleton className="h-[900px] w-full" />
-            ) : (
-              <div className="space-y-5">
-                <WebsiteSection
-                  title="Hero section"
-                  state={hero}
-                  setState={setHero}
-                  currentTitle={data?.hero.title}
-                  currentBody={data?.hero.bodyText}
-                />
-                <WebsiteSection
-                  title="About us"
-                  state={about}
-                  setState={setAbout}
-                  currentTitle={data?.about.title}
-                  currentBody={data?.about.bodyText}
-                />
-                <WebsiteSection
-                  title="Creative"
-                  state={creative}
-                  setState={setCreative}
-                  currentTitle={data?.creative.title}
-                  currentBody={data?.creative.bodyText}
-                  onMultiImage={setCreativeImages}
-                />
-                <WebsiteSection
-                  title="Client"
-                  state={client}
-                  setState={setClient}
-                  currentTitle={data?.client.title}
-                  currentBody={data?.client.bodyText}
-                />
+          {isLoading ? (
+            <Skeleton className="h-[900px] w-full" />
+          ) : (
+            <div className="space-y-5">
+              <WebsiteSection
+                title="Hero section"
+                state={hero}
+                setState={setHero}
+                currentTitle={data?.hero?.title}
+                currentBody={data?.hero?.bodyText}
+                currentImageUrl={data?.hero?.image?.url}
+                onRemoveCurrentImage={() => removeHeroImageMutation.mutate()}
+                removingImage={removeHeroImageMutation.isPending}
+                onSave={() => heroMutation.mutate()}
+                saving={heroMutation.isPending}
+                saveLabel="Update Hero"
+              />
 
-                <div className="rounded-xl border border-slate-200 p-4">
-                  <p className="mb-2 text-lg font-semibold">Contact</p>
-                  <div className="space-y-3">
-                    <Field
-                      label="Address"
-                      value={contact.address}
-                      placeholder={data?.contact.address || "Address"}
-                      onChange={(value) =>
-                        setContact((prev) => ({ ...prev, address: value }))
-                      }
-                    />
-                    <Field
-                      label="Phone number"
-                      value={contact.phoneNumber}
-                      placeholder={data?.contact.phoneNumber || "+555"}
-                      onChange={(value) =>
-                        setContact((prev) => ({ ...prev, phoneNumber: value }))
-                      }
-                    />
-                    <Field
-                      label="Email"
-                      value={contact.email}
-                      placeholder={data?.contact.email || "you@gmail.com"}
-                      onChange={(value) =>
-                        setContact((prev) => ({ ...prev, email: value }))
-                      }
-                    />
+              <WebsiteSection
+                title="About us"
+                state={about}
+                setState={setAbout}
+                currentTitle={data?.about?.title}
+                currentBody={data?.about?.bodyText}
+                currentImageUrl={data?.about?.image?.url}
+                onRemoveCurrentImage={() => removeAboutImageMutation.mutate()}
+                removingImage={removeAboutImageMutation.isPending}
+                onSave={() => aboutMutation.mutate()}
+                saving={aboutMutation.isPending}
+                saveLabel="Update About"
+              />
+
+              <WebsiteSection
+                title="Creative"
+                state={creative}
+                setState={setCreative}
+                currentTitle={data?.creative?.title}
+                currentBody={data?.creative?.bodyText}
+                currentImageUrl={data?.creative?.heroImage?.url}
+                onRemoveCurrentImage={() =>
+                  removeCreativeHeroImageMutation.mutate()
+                }
+                removingImage={removeCreativeHeroImageMutation.isPending}
+                currentGalleryImages={data?.creative?.images}
+                onRemoveGalleryImage={(publicId) =>
+                  removeCreativeGalleryImageMutation.mutate(publicId)
+                }
+                removingGalleryImage={removeCreativeGalleryImageMutation.isPending}
+                onMultiImage={setCreativeImages}
+                onSave={() => creativeMutation.mutate()}
+                saving={creativeMutation.isPending}
+                saveLabel="Update Creative"
+              />
+
+              <WebsiteSection
+                title="Client"
+                state={client}
+                setState={setClient}
+                currentTitle={data?.client?.title}
+                currentBody={data?.client?.bodyText}
+                currentImageUrl={data?.client?.image?.url}
+                onRemoveCurrentImage={() => removeClientImageMutation.mutate()}
+                removingImage={removeClientImageMutation.isPending}
+                onSave={() => clientMutation.mutate()}
+                saving={clientMutation.isPending}
+                saveLabel="Update Client"
+              />
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-2 text-lg font-semibold">Contact</p>
+                <div className="space-y-3">
+                  <Field
+                    label="Address"
+                    value={contact.address}
+                    placeholder={data?.contact?.address || "Address"}
+                    onChange={(value) =>
+                      setContact((prev) => ({ ...prev, address: value }))
+                    }
+                  />
+                  <Field
+                    label="Phone number"
+                    value={contact.phoneNumber}
+                    placeholder={data?.contact?.phoneNumber || "+555"}
+                    onChange={(value) =>
+                      setContact((prev) => ({ ...prev, phoneNumber: value }))
+                    }
+                  />
+                  <Field
+                    label="Email"
+                    value={contact.email}
+                    placeholder={data?.contact?.email || "you@gmail.com"}
+                    onChange={(value) =>
+                      setContact((prev) => ({ ...prev, email: value }))
+                    }
+                  />
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      onClick={() => contactMutation.mutate()}
+                      disabled={contactMutation.isPending}
+                    >
+                      {contactMutation.isPending
+                        ? "Updating..."
+                        : "Update Contact"}
+                    </Button>
                   </div>
                 </div>
-
-                <Button
-                  className="h-12 w-full"
-                  onClick={() => updateMutation.mutate()}
-                >
-                  {updateMutation.isPending
-                    ? "Saving..."
-                    : "Save Website Content"}
-                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -216,6 +400,15 @@ function WebsiteSection({
   currentTitle,
   currentBody,
   onMultiImage,
+  currentImageUrl,
+  onRemoveCurrentImage,
+  removingImage,
+  currentGalleryImages,
+  onRemoveGalleryImage,
+  removingGalleryImage,
+  onSave,
+  saving,
+  saveLabel,
 }: {
   title: string;
   state: SectionState;
@@ -223,6 +416,15 @@ function WebsiteSection({
   currentTitle?: string;
   currentBody?: string;
   onMultiImage?: (files: File[]) => void;
+  currentImageUrl?: string;
+  onRemoveCurrentImage?: () => void;
+  removingImage?: boolean;
+  currentGalleryImages?: Array<{ public_id?: string; url?: string }>;
+  onRemoveGalleryImage?: (publicId: string) => void;
+  removingGalleryImage?: boolean;
+  onSave: () => void;
+  saving?: boolean;
+  saveLabel: string;
 }) {
   const onSelectImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
@@ -236,14 +438,14 @@ function WebsiteSection({
         <Field
           label="Title"
           value={state.title}
-          placeholder={currentTitle || "Job Post"}
+          placeholder={currentTitle || "Title"}
           onChange={(value) => setState({ ...state, title: value })}
         />
         <div>
           <p className="mb-1 text-base font-medium">Body text</p>
           <Textarea
             value={state.bodyText}
-            placeholder={currentBody || "$12.00"}
+            placeholder={currentBody || "Body text"}
             onChange={(event) =>
               setState({ ...state, bodyText: event.target.value })
             }
@@ -264,6 +466,26 @@ function WebsiteSection({
           <Button type="button">Upload Photo</Button>
         </label>
 
+        {currentImageUrl ? (
+          <div className="relative w-fit rounded-xl border border-slate-200 p-2">
+            <img
+              src={currentImageUrl}
+              alt={`${title} image`}
+              className="h-28 w-28 rounded-lg object-cover"
+            />
+            {onRemoveCurrentImage ? (
+              <button
+                type="button"
+                className="absolute -right-2 -top-2 rounded-full bg-black p-1 text-white hover:bg-black/80"
+                onClick={onRemoveCurrentImage}
+                disabled={removingImage}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         {onMultiImage ? (
           <label className="block rounded-xl border border-dashed border-slate-300 p-6 text-center">
             <input
@@ -278,6 +500,50 @@ function WebsiteSection({
             <p className="text-slate-500">Upload additional creative images</p>
           </label>
         ) : null}
+
+        {currentGalleryImages?.length ? (
+          <div>
+            <p className="mb-2 text-sm font-medium text-slate-700">
+              Existing Creative Images
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {currentGalleryImages
+                .filter((image) => image.url)
+                .map((image) => {
+                  const publicId = image.public_id;
+
+                  return (
+                    <div
+                      key={publicId || image.url}
+                      className="relative rounded-xl border border-slate-200 p-2"
+                    >
+                      <img
+                        src={image.url}
+                        alt="Creative gallery"
+                        className="h-20 w-20 rounded-lg object-cover"
+                      />
+                      {publicId && onRemoveGalleryImage ? (
+                        <button
+                          type="button"
+                          className="absolute -right-2 -top-2 rounded-full bg-black p-1 text-white hover:bg-black/80"
+                          onClick={() => onRemoveGalleryImage(publicId)}
+                          disabled={removingGalleryImage}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="pt-2">
+          <Button type="button" onClick={onSave} disabled={saving}>
+            {saving ? "Updating..." : saveLabel}
+          </Button>
+        </div>
       </div>
     </div>
   );

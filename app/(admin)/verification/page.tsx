@@ -66,7 +66,7 @@ export default function VerificationPage() {
     <div>
       <div>
         <Card>
-          <CardContent>
+          <CardContent className="p-6">
             <PageHeader
               title="Verification"
               breadcrumbs={["Dashboard", "Creative Management"]}

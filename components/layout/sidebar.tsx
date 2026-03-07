@@ -70,7 +70,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="flex h-full w-[290px] flex-col border-r border-slate-100 bg-white p-6">
+      <aside className="flex h-full w-[312px] min-w-[312px] shrink-0 flex-col border-r border-slate-100 bg-white p-6 font-[var(--font-outfit)]">
         {/* Logo Section */}
         <div className="mb-10 flex items-center gap-3">
           <Image
@@ -95,7 +95,7 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-4 rounded-xl px-4 py-3 text-base font-medium transition-all",
+                  "flex items-center gap-4 rounded-xl px-4 py-3 text-[16px] font-normal leading-[120%] tracking-[0] transition-all",
                   isActive
                     ? "bg-[#112d6a] !text-white shadow-lg"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -124,10 +124,10 @@ export function Sidebar() {
               src={profile?.profileImage?.url}
             />
             <div className="flex flex-col">
-              <span className="text-base font-bold leading-tight text-slate-900">
+              <span className="text-[16px] font-normal leading-[120%] tracking-[0] text-slate-900">
                 {session?.user?.name || "Glen Khumalo"}
               </span>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="text-[16px] font-normal leading-[120%] tracking-[0] text-slate-500">
                 {session?.user?.role || "Glen Khumalo"}
               </span>
             </div>
@@ -135,7 +135,7 @@ export function Sidebar() {
 
           <button
             onClick={() => setIsLogoutModalOpen(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-red-100 py-3 text-base font-bold text-red-500 transition-colors hover:bg-red-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-red-100 py-3 text-[16px] font-normal leading-[120%] tracking-[0] text-red-500 transition-colors hover:bg-red-50"
           >
             <LogOut className="h-5 w-5 rotate-180" />
             Log out

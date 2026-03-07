@@ -25,7 +25,7 @@ export default function AdminLayout({
         {/* Sidebar */}
         <div
           className={[
-            "fixed z-50 h-full w-[290px] transition-transform lg:static lg:translate-x-0",
+            "fixed z-50 h-full w-[312px] transition-transform lg:static lg:translate-x-0",
             open ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
         >

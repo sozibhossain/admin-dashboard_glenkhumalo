@@ -30,22 +30,6 @@ export function Topbar({
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative w-full max-w-xl">
-        <Input
-          placeholder={placeholder}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="h-11 pr-14 text-base"
-        />
-        <button
-          type="button"
-          className="absolute right-0 top-0 h-11 w-14 rounded-r-md bg-gradient-to-b from-[#3d5f9f] to-[#1b366f] text-white"
-        >
-          <Search className="mx-auto h-5 w-5" />
-        </button>
-      </div>
-
       {/* Profile */}
       <div className="ml-auto flex items-center gap-3 whitespace-nowrap">
         <p className="hidden text-base font-medium text-slate-800 sm:block">
